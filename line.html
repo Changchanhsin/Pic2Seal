@@ -1,0 +1,166 @@
+﻿<!DOCTYPE HTML PUBLIC> 
+<html> 
+ <head> 
+ <meta charset="utf-8"> 
+ <title>获取图片像素颜色,转换为css3 box-shadow</title> 
+ <style type="text/css"> 
+  body{margin: 0px; background:#f2f2f0;} 
+  p{margin:0px;} 
+  .showimg{margin:10px auto 10px auto; -webkit-transition: all .3s; transition: all .3s;} 
+  .showimg span{width:1px; height:1px; display:block; margin: -1px 0px 0px -1px;} 
+  .css_code{margin:10px; padding:10px; display:none; border:1px solid #FFCC00; font-size:12px; background:#F1F1F1; white-space:pre-wrap; word-wrap:break-word; height:300px; overflow:auto;} 
+  .css_code:hover{ 
+    background:#DEFEDE; 
+  } 
+ </style> 
+   
+ <script type="text/javascript"> 
+
+var xScale = 1;
+var xCell=0;
+var yScale = 1;
+var yCell=0;
+var zScale = 1;
+var zStep = 1;
+
+function maxrgb(r, g, b){
+  if( r>=g && r>=b) return r;
+  if( g>=r && g>=b) return g;
+  return b;
+}
+
+function minrgb(r, g, b){
+  if( r<=g && r<=b) return r;
+  if( g<=r && g<=b) return g;
+  return b;
+}
+
+function rgbToHsl(r, g, b){
+    r /= 255, g /= 255, b /= 255;
+    var max = maxrgb(r, g, b), min = minrgb(r, g, b);
+    var h, s, l = (max + min) / 2;
+
+    if(max == min){
+        h = s = 0; // achromatic
+    }else{
+        var d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch(max){
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+
+    //return [h, s, l];
+    return l;
+}
+
+window.onload = function(){
+  var canvas = document.createElement('canvas');
+  var context = canvas.getContext('2d');
+  var showimg = document.getElementById('showimg');
+  var shadow = showimg.getElementsByTagName('span')[0];
+  var g_code = document.getElementById('g_code');
+
+  document.getElementById('img').onchange = function() {
+  //function doAction(){
+    var img = event.target.files[0];
+    // 检查能否读取图片
+    if(!img){
+      return ;
+    }
+    // 检查图片类型
+    if(!(img.type.indexOf('image')==0 && img.type && /\.(?:jpg|png|gif)$/.test(img.name)) ){
+      alert('图片只能是jpg,gif,png');
+      return ;
+    }
+    var reader = new FileReader();
+    reader.readAsDataURL(img);
+    reader.onload = function(e){ // reader onload start
+      var image = new Image();
+      image.src = e.target.result;
+      image.onload = function(){ // image onload start
+        var img_width = this.width;
+        var img_height = this.height;
+
+        var xScale = document.getElementById('x_scale').value;
+        var yScale = document.getElementById('y_scale').value;
+        var zScale = document.getElementById('z_scale').value;
+        xScale /= img_width;
+        var xCell = xScale/2;
+        yScale /= img_height;
+        var yCell = yScale/2;
+        var prevColor=0;
+        var currColor=0;
+        var prevX=0;
+        var img_offset =0;
+
+        // 设置画布尺寸,将图片按像素写入画布,读取图片像素信息
+        canvas.width = img_width;
+        canvas.height = img_height;
+        context.drawImage(this, 0, 0, img_width, img_height);
+        var imageData = context.getImageData(0, 0, img_width, img_height);
+        var arrg=[], length = imageData.data.length;
+
+        // 生成box-shadow
+        for(var j=0; j<img_height; j++){
+          arrg.push('g0 z0');
+          arrg.push('g0 x' + (xCell) + ' y' + (j * yScale + yCell));
+          prevColor = 0;
+          prevX = 0;
+          for(var i=0; i<img_width; i++){
+            img_offset = (j * img_width + i) *4;
+            currColor = rgbToHsl(imageData.data[img_offset], imageData.data[img_offset+1], imageData.data[img_offset+2]);
+            if(currColor != prevColor){
+            //arrg.push('; 【第'+ j +'行;第' + i + '点;prevColor=' + prevColor + ';prevX='+ prevX + ';】');
+              if(prevX != i){
+                if(prevX != (i-1)){
+                  arrg.push('g1 x' + ((i-1) * xScale + xCell));
+                }
+                if(prevColor<currColor){
+                  arrg.push('g1 z-' + (zScale * currColor));
+                }
+                arrg.push('g1 x' + (i * xScale + xCell));
+              }
+              arrg.push('g1 z-' + (zScale * currColor));
+              prevColor = currColor;
+              prevX = i;
+            }
+          }
+          if(prevColor != 0){
+            arrg.push('g1 x' + ((i-1) * xScale + xCell));
+            prevColor = currColor;
+          }
+        }
+        arrg.push('g0 z0');
+        arrg.push('g0 x0 y0 z10');
+
+        // 将数据写入dom
+        showimg.style.width = img_width + 'px';
+        showimg.style.height = img_height + 'px';
+        shadow.innerHTML = '<img src="' + image.src + '"/>';
+        g_code.style.display = 'block';
+        g_code.innerHTML = arrg.join('\n');
+        // alert("");
+      }
+    }
+  }
+}
+ </script> 
+  
+ </head> 
+  
+ <body> 
+ <p class="title">取图像色,转换为CSS3 box-shadow</p> 
+ <p><input type="file" class="file" id="img" name="选择图片">
+    <input type="button" id="dogo" value="do" onclick="doAction();">
+ <p>x scale<input type="text" id="x_scale"  value="1" /></p>
+ <p>y scale<input type="text" id="y_scale"  value="1" /></p>
+ <p>z scale<input type="text" id="z_scale"  value="1" /></p>
+
+ <p class="showimg" id="showimg"><span></span></p> 
+ <p class="css_code" id="g_code"></p> 
+ </body> 
+</html> 
